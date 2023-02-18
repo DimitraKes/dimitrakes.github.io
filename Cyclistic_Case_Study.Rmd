@@ -1,0 +1,343 @@
+---
+title: "Cyclistic Bike-Share (Case Study 1)"
+output:
+  pdf_document: default
+date: "2023-01-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+  **Cyclistic** has been offering bike-sharing services in Chicago since 2016. Any of their 5824 geotracked bicycles can be unlocked from any of their 692 stations across Chicago and be returned to any other station in the system anytime.
+  **Cyclistic** offers their customers the following pricing plans:
+  
+*  Single-ride pass for 3.5$
+*  Full-day pass for 17.5$
+*  Annual membership for 120$ per year
+
+  **Cyclistic**'s finance analysts have come to the conclusion that annual members are the most profitable and have been creating a marketing campaign to that end.
+
+# Prepare
+  In this analysis, we have used **Cyclistic**'s historical trip to analyze and identify trends.Data form January 2022 to December 2022 have been used in this analysis. In this step, we set up our environment, imported our data and created dataframes. Then, we sorted and filtered the dataframes.
+  
+### Setting up my environment
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+```
+
+
+### Creating dataframes for each month
+
+```{r}
+df_01<- read_csv("202201-divvy-tripdata.csv")
+
+df_02<- read_csv("202202-divvy-tripdata.csv")
+
+df_03<- read_csv("202203-divvy-tripdata.csv")
+
+df_04<- read_csv("202204-divvy-tripdata.csv")
+
+df_05<- read_csv("202205-divvy-tripdata.csv")
+
+df_06<- read_csv("202206-divvy-tripdata.csv")
+
+df_07<- read_csv("202207-divvy-tripdata.csv")
+
+df_08<- read_csv("202208-divvy-tripdata.csv")
+
+df_09<- read_csv("202209-divvy-tripdata.csv")
+
+df_10<- read_csv("202210-divvy-tripdata.csv")
+
+df_11<- read_csv("202211-divvy-tripdata.csv")
+
+df_12<- read_csv("202212-divvy-tripdata.csv")
+
+```
+
+
+### Creating dataframes for each quarter
+```{r}
+df_q1<-rbind(df_01, df_02,df_03)
+
+df_q2<-rbind(df_04, df_05,df_06)
+
+df_q3<-rbind(df_07, df_08,df_09)
+
+df_q4<-rbind(df_10, df_11,df_12)
+
+```
+
+
+### Creating a dataframe for the whole year
+```{r}
+df_2022<-rbind(df_q1,df_q2,df_q3,df_q4)
+dim(df_2022)
+```
+
+### Dropping a few unnecessary columns
+```{r}
+df_2022<-df_2022 %>%
+  select(-c(start_lat,end_lat,start_lng,end_lng))
+```
+
+# Process
+  In this step, we created a few useful columns. Then, we cleaned our data by removing test station results, any ride length bellow 60 seconds and any negative ride lengths. We also made sure that every variable is stored using the correct type of variable. 
+  
+## Cleaning the data
+
+### Dropping the NA values
+```{r}
+df_2022<- df_2022 %>%
+  drop_na()
+
+```
+
+### Creating trip column
+```{r}
+df_2022$trip<- paste(df_2022$start_station_name,df_2022$end_station_name, sep = ' - ')
+```
+
+
+### Creating columns for the year, month,day, day of the week and time of day
+```{r}
+df_2022$date<- as.Date(df_2022$started_at) 
+df_2022$year<- format(as.Date(df_2022$started_at), "%Y") 
+df_2022$month <- format(as.Date(df_2022$started_at), "%B") 
+df_2022$day <- format(as.Date(df_2022$started_at), "%d")
+df_2022$day_of_week <- format(as.Date(df_2022$started_at), "%A")
+df_2022$time_of_day <-  format(as.POSIXct(df_2022$started_at), format = "%H")
+```
+
+
+### Creating the ride_length column (in minutes)
+```{r}
+df_2022$ride_length <- difftime(df_2022$ended_at, df_2022$started_at)
+```
+
+
+### Convert "ride_length" to numeric 
+```{r}
+df_2022$ride_length <- as.numeric(df_2022$ride_length)/60
+
+```
+
+### Removing bad data
+ The dataframe includes entries when bikes were taken out of docks and checked for quality by Divvy (test station results), entries with negative ride lengths and entries with ride lengths less than 60 seconds.
+ 
+```{r}
+df_2022_v2 <- subset(df_2022, start_station_name != "HQ QR" & df_2022$ride_length>=1)
+```
+
+## Inspecting the new dataframe 
+```{r}
+dim(df_2022_v2)
+head(df_2022_v2)
+tail(df_2022_v2)
+summary(df_2022_v2)
+
+```
+
+# Analysis
+
+### Analysis on ride length
+```{r}
+summary(df_2022_v2$ride_length)
+```
+
+
+### Comparing members vs casual users
+```{r}
+aggregate(df_2022_v2$ride_length ~ df_2022_v2$member_casual, FUN = mean)
+aggregate(df_2022_v2$ride_length ~ df_2022_v2$member_casual, FUN = median)
+aggregate(df_2022_v2$ride_length ~ df_2022_v2$member_casual, FUN = max)
+aggregate(df_2022_v2$ride_length ~ df_2022_v2$member_casual, FUN = min)
+```
+
+
+### Checking the average time per day of the week for users
+```{r}
+aggregate(df_2022_v2$ride_length ~ df_2022_v2$member_casual + df_2022_v2$day_of_week, FUN = mean)
+```
+
+
+Putting the days of the week in order
+```{r}
+df_2022_v2$day_of_week <- ordered(df_2022_v2$day_of_week, levels=c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+aggregate(df_2022_v2$ride_length ~ df_2022_v2$member_casual + df_2022_v2$day_of_week, FUN = mean)
+
+```
+
+Putting the months in order
+```{r}
+df_2022_v2$month <- ordered(df_2022_v2$month, levels=c("January", "February", "March", "April", "May", "June", "July", 'August','September','October','November','December'))
+
+```
+
+
+### Analyzing ride length average and number of rides per weekday per type of user(Pivot table)
+```{r}
+pvt_01<- df_2022_v2 %>%
+  group_by(member_casual,day_of_week) %>%
+  summarise(number_of_rides= n(), average_duration=mean(ride_length)) %>%
+  arrange(member_casual,day_of_week)
+print(pvt_01)
+```
+
+### Analyzing number of rides per month per type of user(Pivot table)
+```{r}
+pvt_02<- df_2022_v2 %>%
+  group_by(member_casual,month) %>%
+  summarise(number_of_rides= n(), average_duration=mean(ride_length)) %>%
+  arrange(member_casual,month)
+print(pvt_02)
+```
+### Analyzing number of rides per time of day (Pivot table)
+```{r}
+pvt_03<- df_2022_v2 %>%
+  group_by(member_casual,time_of_day) %>%
+  summarise(number_of_rides= n()) %>%
+  arrange(member_casual,time_of_day)
+print(pvt_03)
+```
+
+
+### Analyzing type of bike per type of user
+```{r}
+pvt_04<- df_2022_v2 %>%
+  group_by(rideable_type, member_casual) %>%
+  summarise(number_of_rides=n()) %>%
+  arrange(rideable_type, member_casual)
+print(pvt_04)
+```
+### Analyzing the number of rides per trip
+```{r}
+pvt_05<- df_2022_v2 %>%
+  group_by(trip,member_casual) %>%
+  summarise(number_of_rides=n()) %>%
+  arrange(desc(number_of_rides)) %>%
+  head(10)
+
+print(pvt_05)
+```
+### Number of trips (%) per type of user
+```{r}
+pvt_06<- df_2022_v2 %>%
+  group_by(member_casual) %>%
+  summarise(number_of_rides=n())
+print(pvt_06)
+```
+
+
+
+# Sharing
+## Creating bar plots to visualize our analysis
+
+
+```{r}
+slices <- pvt_06$number_of_rides
+lbls <- pvt_06$member_casual
+pct <- round(slices/sum(slices)*100)
+lbls <- paste(lbls, pct) # add percents to labels
+lbls <- paste(lbls,"%",sep="") # ad % to labels
+pie(slices,labels = lbls, col=rainbow(length(lbls)),
+    main="Rides per type of user")
+```
+
+#### 3 out of 5 rides are commenced by members, while 2 out of 5 by casual users.
+
+
+```{r}
+
+ggplot(pvt_04,mapping=aes(x=rideable_type, y=number_of_rides/1000, fill=member_casual)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  labs(title='Type of bike vs type of user', x='Type of bike', y='Number of rides in thousands', fill='Type of user')
+```
+
+#### All users prefer the classic bike over an electric bike, however, this divergence is quite significant for members, as 2 out of 3 members prefer the classic bike. None of the members used a docked bike.
+
+
+```{r}
+ggplot(pvt_05, mapping=aes(x=number_of_rides,y=trip,fill=member_casual)) +
+  geom_bar(stat="identity") +
+  labs(title='Most popular trips', x='Number of rides', y='Trip', fill='Type of user')
+```
+
+#### By far the most popular trip begins and ends at Streeter Dr $ Grand Ave station and it is taken by our casual users, while the most popular trip for our members is from Ellis Ave &60th St to University Ave & 57th St.
+
+
+```{r}
+ggplot(pvt_02, mapping=aes(x=month, y=number_of_rides/1000, group=member_casual))+
+  geom_line(aes(color=member_casual)) + geom_point(aes(color=member_casual, shape=member_casual))+
+  labs(title='Most popular month', x='Month', y='Number of rides in thousands', fill='Type of user')
+```
+
+#### Summer is definitely the most popular season for both types of users. July was the most popular month for casual users with over 300000 rides, for the member all three months of summer are almost tied, with August having a small lead.
+
+
+```{r}
+ggplot(pvt_02, mapping=aes(x=month, y=average_duration, group=member_casual))+
+  geom_line(aes(color=member_casual)) + geom_point(aes(color=member_casual, shape=member_casual))+
+  labs(title='Average ride length per month for users', x='Month', y='Average ride length in minutes', fill='Type of user')
+
+```
+
+#### For members we notice an increase on the duration of the rides during the summer months. On the other hand, the average duration for casual users peaks on March.
+
+
+```{r}
+ggplot(pvt_02, mapping=aes(x=month, y=number_of_rides/1000, fill=member_casual))+
+  geom_bar(stat='identity') +
+  labs(title='Number of rides per month for users', x='Month', y='Number of rides in thousands', fill='Type of user')
+```
+
+#### Nevertheless, July is the most popular month overall.
+
+
+```{r}
+ggplot(pvt_01,mapping=aes(x=day_of_week, y=number_of_rides/1000, fill=member_casual)) +
+  geom_bar(stat="identity", position = position_dodge()) +
+  labs(title="Number of rides per day for users", x="Day of the week", y="Number of rides in thousands", fill="Type of user")
+```
+
+#### Members tend to use the bikes more on weekdays than during the weekends. On the contrary, casual users use the bikes more on weekends, especially on Saturday.
+
+
+```{r}
+ggplot(pvt_01,mapping=aes(x=day_of_week, y=average_duration, fill=member_casual)) +
+  geom_bar(stat="identity", position = position_dodge()) +
+  labs(title="Average ride length per day for users", x="Day of the week", y="Average duration of ride in minutes", fill="Type of user")
+
+```
+
+#### Members’ average duration of ride is almost steady during the whole week, at about 12.7 minutes, while the casual users’ average duration drops noticeably on Tuesday until Friday.   
+
+
+
+
+```{r}
+ggplot(pvt_03, mapping=aes(x=time_of_day, y=number_of_rides/1000, group=member_casual))+
+  geom_line(aes(color=member_casual)) + geom_point(aes(color=member_casual, shape=member_casual))+
+  labs(title='Most popular time of day', x='Time of day', y='Number of rides in thousands', fill='Type of user')
+  
+```
+
+#### Peak hour among member users is around 5pm, however there is a noticeable spike at 8am as well. Seems like members use the bike-sharing services to commute to work.
+#### For casual users, the number of rides increase around noon and peak at 5pm as well.
+
+
+# Act
+
+#### According to this analysis, most rides by casual users are commenced around 5pm which indicates that they be commuting home from work. A marketing campaign that points out the way that Cyclistic can fit into one’s everyday life and suggests to their casual users to invest in a membership and give commuting to work by bike a try would be beneficial to the company’s profits.
+#### Communicating with known companies near the most visited by casual users stations and inform them about our prices and maybe offer them special deals. That way, they can offer their employees bike to work schemes and Cyclistic’s popularity will grow among Chicago’s work force.
+#### Casual users that use the service most should be contacted through email or mobile phone notifications to be reminded of Cyclistic’s pricing plans, indicate how they will benefit financially by the annual membership and urge them invest in one.
+#### Promote the freedom that is riding a bike. Draw a parallel between getting an annual membership, and the feeling free as a child
+
+
+
