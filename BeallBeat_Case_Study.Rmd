@@ -1,0 +1,376 @@
+---
+title: "BeallBeat (Case Study 2)"
+author: "Dimitra Kes"
+date: "2023-02-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+**BellaBeat** is a high-tech company that manufactures health - focused smart products in order to inform, inspire women all around the world.  
+**BellaBeat** accomplishes to empower women with knowledge of their own health and habits since 2013 by collecting data on activity, sleep, stress and reproductive health.  
+The purpose of this analysis is to point out some important trends in smart device usage and suggest ways **BellaBeat** can use those trends to build a better marketing strategy.
+
+
+
+
+# Prepare
+In this analysis, we used a data set containing personal fitness tracker from 30 Fitbit users. The data set includes minute-level output for personal activity, heart rate, sleep monitoring, steps and daily activity in order to help us explore users' habits.  
+Firstly, we set up our working environment. Then, we imported our data and created dataframes. Last but not least, we sorted and filtered said dataframes.
+
+### Setting up my environment
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+library(ggcorrplot)
+```
+
+### Creating dataframes 
+```{r}
+daily_activity <- read_csv('dailyActivity_merged.csv')
+sleep_day <- read_csv('sleepDay_merged.csv')
+weight_log_info <- read_csv('weightLogInfo_merged.csv')
+heart_rate<- read_csv('heartrate_seconds_merged.csv')
+```
+
+### Inspecting the dataframes
+```{r}
+str(daily_activity)
+```
+```{r}
+str(sleep_day)
+```
+```{r}
+str(weight_log_info)
+```
+```{r}
+str(heart_rate)
+```
+
+
+
+
+# Process
+During this step, we dropped NA values and mostly empty columns. Also, we created some useful columns to help us explore our data set further. Furthermore, we made sure every variable is stored using the correct variable type and the units of measurement are the ones that make our data easier to comprehend. 
+
+### Dropping fat column as it is mostly empty
+```{r}
+weight_log_info <- weight_log_info %>%
+  select(-c(Fat, IsManualReport,LogId))
+```
+
+
+### Dropping rows with NA values
+```{r}
+daily_activity<- daily_activity %>%
+  drop_na()
+sleep_day<- sleep_day %>%
+  drop_na()
+weight_log_info<- weight_log_info %>%
+  drop_na()
+heart_rate <- heart_rate %>%
+  drop_na()
+```
+
+
+### Sleep
+
+
+#### Converting minutes to hours
+```{r}
+sleep_day$Total_Hours_Asleep<- sleep_day$TotalMinutesAsleep/60 
+sleep_day$Total_Hours_In_Bed <- sleep_day$TotalTimeInBed/60 
+```
+
+
+### Daily Activities
+
+#### Converting Activity Date from char to date
+```{r}
+daily_activity$ActivityDate <- mdy(daily_activity$ActivityDate)
+```
+
+#### Grabbing the day of the week
+```{r}
+daily_activity$day_of_week<-format(as.Date(daily_activity$ActivityDate), "%A")
+```
+
+### Weight
+
+#### Converting Id to character
+```{r}
+weight_log_info$Id<- as.character(weight_log_info$Id)
+```
+
+### Heart Rate
+
+#### Removing AM & PM from dates & times and converting Time from char to datetime
+```{r}
+heart_rate$Time  <- parse_date_time(heart_rate$Time ,"%m/%d/%Y %I:%M:%S %p")
+```
+
+
+#### Grabbing the hour
+```{r}
+heart_rate$time_of_day <- hour(heart_rate$Time)
+```
+
+
+
+
+# Analysis
+### How did the women use the smart device?
+```{r}
+number_of_women <-c(n_distinct(daily_activity$Id), n_distinct(sleep_day$Id), n_distinct(weight_log_info$Id))
+use_of_service<-c('Daily Activity', 'Sleep', 'Weight')
+women_part <- data.frame(use_of_service, number_of_women )
+print(women_part)
+```
+
+### Sleep
+```{r}
+sleep_day %>%
+  select(c(Total_Hours_Asleep, TotalSleepRecords,Total_Hours_In_Bed)) %>%
+  summary()
+```
+#### <span style="color: blue;">Note: Participants sleep on average 7 hours per night while the spend about 7.6 hours in bed.</span>
+
+#### Dropping the non numeric columns
+```{r}
+sleep_day_numeric <- sleep_day %>%
+  select(-c(Id,SleepDay))
+
+```
+
+#### Creating a correlation matrix for sleep
+```{r}
+sleep_day_corr_matrix<- cor(sleep_day_numeric , method='pearson' )
+print(sleep_day_corr_matrix)
+```
+
+#### Creating a pivot table to show the percentage of times of sleep per day
+```{r}
+sleep_times_pcnt<- sleep_day %>%
+  group_by(TotalSleepRecords) %>%
+  summarise(count=n())
+print(sleep_times_pcnt)
+```
+
+### Steps
+#### Creating a pivot table for most walked day
+```{r}
+most_walked_day<- daily_activity %>%
+  group_by(day_of_week) %>%
+  summarise(avg_steps=mean(TotalSteps))
+print(most_walked_day)
+```
+
+
+
+### Daily Activity
+#### Creating the correlation matrix
+```{r}
+daily_activity_numeric <- select(daily_activity, -c(Id,ActivityDate,day_of_week))
+daily_act_corr_matrix<- cor(daily_activity_numeric, method='pearson' )
+```
+##### <span style="color: red;">Note: This correlation matrix is too big to print.</span>
+
+### Weight 
+
+#### Keeping the observations that are more than 20
+```{r}
+num_of_entries<- weight_log_info %>%
+  group_by(Id) %>%
+  summarise(count=n()) 
+num_of_entries<- subset(num_of_entries, count>=20)  
+print(num_of_entries)
+```
+
+
+#### Grabbing the Ids
+```{r}
+for (i in 1:nrow(num_of_entries)) {
+  dian<-c(num_of_entries$Id)
+  
+}
+print(dian)
+```
+
+
+#### Get a subset for those Ids
+```{r}
+sign_entries<-0
+for (i in 1:length(dian)) {
+  sign_entries<-merge(sign_entries, subset(weight_log_info, Id=dian[i]))
+  
+}
+print(sign_entries)
+```
+
+#### Creating a correlation matrix
+```{r}
+weight_log_info_numeric<- weight_log_info %>%
+  select(-c(Id,Date))
+weight_log_corr_matrix<- cor(weight_log_info_numeric, method='pearson' )
+print(weight_log_corr_matrix)
+```
+
+### Heart Rate
+#### Creating a pivot table for the average heart rate per hour
+```{r}
+avg_heart_rate_table<- heart_rate %>%
+  group_by(time_of_day) %>%
+  summarise(avg_heart_rate=mean(Value))
+summary(avg_heart_rate_table)
+```
+
+
+
+
+# Sharing
+
+### Participants
+```{r}
+ggplot(women_part, mapping=aes(x=use_of_service, y=number_of_women, fill=use_of_service))+
+  geom_bar(stat='identity')+
+  labs(title='How women use the smart device', x='Type of use', y='Number of women', fill='Type of use')
+```
+
+### Sleep
+
+```{r}
+ggcorrplot(sleep_day_corr_matrix, type='lower', lab=TRUE)
+```
+
+#### <span style="color: blue;">Note: Very high positive correlation between Total minutes asleep and time in bed (0.93)</span>
+```{r}
+ggplot(sleep_day, mapping=aes(x=TotalMinutesAsleep, y= TotalTimeInBed)) +
+  geom_point() +
+  labs(title = 'Time in bed vs sleep time', x='Time asleep', y='Time in bed')
+```
+
+#### Converting Total Sleep Records to character for a better graph
+```{r}
+sleep_day$TotalSleepRecords <- as.character(sleep_day$TotalSleepRecords)
+```
+
+```{r}
+ggplot(sleep_day, mapping=aes(x=TotalMinutesAsleep, y= TotalTimeInBed, group=TotalSleepRecords)) +
+  geom_point(aes(color=TotalSleepRecords, shape=TotalSleepRecords)) +
+  labs(title = 'Time in bed vs sleep time', x='Time asleep', y='Time in bed', fill='Sleep Records')
+```
+
+#### <span style="color: blue;">Note: Total sleep records does not affect the relationship between time in bed anf time asleep </span>
+
+
+
+```{r}
+slices <- sleep_times_pcnt$count
+lbls <- c('Once', 'Twice', 'Thrice')
+pct <- round(slices/sum(slices)*100)
+lbls <- paste(lbls, pct) # add percents to labels
+lbls <- paste(lbls,"%",sep="") # ad % to labels
+pie(slices,labels = lbls, col=rainbow(length(lbls)),
+    main="Total Sleep Records per day")
+```
+
+
+#### <span style="color: blue;">Note: Most participants sleep once per day</span>
+
+##  Daily Activity
+
+### Putting the days of the week in order
+
+```{r}
+most_walked_day$day_of_week <- ordered(most_walked_day$day_of_week, levels=c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+```
+
+```{r}
+ggplot(most_walked_day, mapping=aes(x=day_of_week, y=avg_steps, fill=day_of_week))+
+  geom_bar(stat='identity')+
+  labs(title='Most walked day of the week', x='Day of the week',y='Average number of steps', fill='Day of the week')+
+  scale_y_continuous(breaks=seq(0,8500, by=500))
+```
+
+#### <span style="color: blue;">Note: Saturday and Tuesday are the most walked days of the week, while Sunday has the smallest number of steps. </span>
+
+```{r}
+ggcorrplot(daily_act_corr_matrix, type='lower', lab=TRUE)
+```
+
+#### <span style="color: blue;">Note: Let's take a closer look. </span>
+```{r}
+ggplot(daily_activity, mapping=aes(x=TrackerDistance, y= TotalDistance)) +
+  geom_point() +
+  labs(title = 'Tracked vs total distance in miles', x='Tracked Distance', y='Total Distance')
+```
+
+#### <span style="color: blue;">Note: There is a very high possitive correlation (1) between Total Distance and Tracked Distance.</span>
+```{r}
+ggplot(daily_activity, mapping=aes(x=TrackerDistance, y= TotalSteps)) +
+  geom_point() +
+  labs(title = 'Tracked distance in miles vs steps', x='Tracked Distance', y='Number of steps')
+```
+
+#### <span style="color: blue;">Note: There is a very high possitive correlation (0.98) between Number of Steps and Tracked Distance.</span>
+```{r}
+ggplot(daily_activity, mapping=aes(x=TotalSteps, y= TotalDistance)) +
+  geom_point() +
+  labs(title = 'Steps vs total distance in miles', x='Number of steps', y='Total Distance')
+```
+
+#### <span style="color: blue;">Note: There is a very high possitive correlation (0.99) between Total Distance and Number of Steps.</span>
+```{r}
+ggplot(daily_activity, mapping=aes(x=ModeratelyActiveDistance, y= FairlyActiveMinutes)) +
+  geom_point() +
+  labs(title = 'Moderately Active Distance vs Fairly Active Steps', x='Moderately Active Distance', y='Fairly Active Minutes')
+```
+
+#### <span style="color: blue;">Note: There is a very high possitive correlation (0.95) between Fairly Active Minutes and Moderaly Active Distance.</span>
+```{r}
+ggplot(daily_activity, mapping=aes(x=SedentaryMinutes, y= LightActiveDistance)) +
+  geom_point() +
+  labs(title = 'Sedentary Minutes vs Lightly Active Minutes', x='Light Active Distance', y='Sedentary Minutes')
+```
+
+#### <span style="color: blue;">Note: There is a low negative correlation (-0.41) between Light Active Distance and Sedentary Minutes.</span>
+
+## Weight
+```{r}
+ggplot(sign_entries, aes(x=Date, y=WeightKg, group=Id)) + geom_line(aes(colour=Id))+
+  geom_point()+
+  labs(title='Monitoring our weight', x='Time', y='Weight (in kg)')+
+  theme(axis.text.x=element_blank())
+  
+```
+
+#### <span style="color: blue;">Note: The 2 women that monitored their weight, kept it at a steady average</span>
+
+```{r}
+ggcorrplot(weight_log_corr_matrix, type='lower', lab=TRUE)
+```
+
+#### <span style="color: blue;">Note: There is a high possitve correlation (0.74) between weight and BMI.</span>
+
+## Heart Rate
+```{r}
+ggplot(avg_heart_rate_table, mapping=aes(x=time_of_day, y=avg_heart_rate))+
+  geom_point(color='blue')+
+  geom_line()+
+  labs(title='Most active time of day', x='Time of day',y='Average heart rate')+
+  scale_x_continuous( breaks = c(seq(0,24, by=1)))+
+  scale_y_continuous(breaks=c(seq(60,90, by=5)))
+```
+
+#### <span style="color: blue;">Note: Most active time of the day is at 6pm.</span>
+
+# Act
+
+### Most women used the smart watch to monitor their daily activity, some to monitor their sleep and very few women used the smart watch to monitor their weight.  
+### I would suggest the use of a notification system to remind women to input their weight entries.  
+### Also, a campaign to explain the benefits that wearing the watch in your sleep may have. Finally, a notification system that reminds women to get up and move can help them be more active.
